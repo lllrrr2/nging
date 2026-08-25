@@ -276,7 +276,7 @@ require (
 	github.com/admpub/go-reuseport v0.5.0 // indirect
 	github.com/admpub/go-utility v0.0.1 // indirect
 	github.com/admpub/godotenv v1.4.4 // indirect
-	github.com/admpub/goth v0.0.4 // indirect
+	github.com/admpub/goth v0.0.5 // indirect
 	github.com/admpub/httpscerts v0.0.0-20180907121630-a2990e2af45c // indirect
 	github.com/admpub/humanize v0.0.0-20190501023926-5f826e92c8ca // indirect
 	github.com/admpub/i18n v0.6.1 // indirect
