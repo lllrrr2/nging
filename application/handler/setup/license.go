@@ -20,6 +20,7 @@ package setup
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/coscms/webcore/library/backend"
 	"github.com/coscms/webcore/library/config"
@@ -46,12 +47,23 @@ func postLicense(c echo.Context) error {
 
 // License 获取商业授权
 func License(c echo.Context) error {
-	err := license.Check(c)
-	if err != nil && c.IsPost() {
+	if c.Queryx(`jumpToProduct`).Bool() { // {{BackendURL}}/license?jumpToProduct=1&op=buy
+		productURL := license.ProductDetailURL()
+		args := []string{}
+		op := c.Query(`op`)
+		if len(op) > 0 {
+			args = append(args, `op`, op)
+		}
+		productURL = com.WithURLParams(productURL, `source`, c.Site(), args...)
+		return c.Redirect(productURL)
+	}
+	checkErr := license.Check(c)
+	err := checkErr
+	if checkErr != nil && c.IsPost() {
 		err = postLicense(c)
 	}
 	if err == nil {
-		nextURL := c.Form(`next`)
+		nextURL := echo.GetNextURL(c)
 		if len(nextURL) == 0 {
 			nextURL = backend.URLFor(`/`)
 		}
@@ -72,11 +84,15 @@ func License(c echo.Context) error {
 		`License expired`:               c.T(`授权已过期`),
 		`License does not exist`:        c.T(`授权文件不存在`),
 	}
-	if errStr, ok := errMap[err.Error()]; ok {
+	errStr := err.Error()
+	errStr = strings.TrimLeft(errStr, `[L] `)
+	errStr = strings.TrimLeft(errStr, `[R] `)
+	errStr = strings.TrimSpace(errStr)
+	if errStr, ok := errMap[errStr]; ok {
 		err = errors.New(errStr)
 	}
 	//需要重新获取授权文件
-	if err == license.ErrLicenseNotFound && license.LicenseMode() != license.ModeDomain {
+	if checkErr != nil && errors.Is(checkErr, license.ErrLicenseNotFound) && license.LicenseMode() != license.ModeDomain {
 		err = license.DownloadOnce(c)
 		c.Set(`downloaded`, err == nil)
 	} else {
@@ -84,9 +100,6 @@ func License(c echo.Context) error {
 	}
 
 	c.Set(`licenseFile`, license.FilePath())
-	productURL := license.ProductDetailURL()
-	productURL = com.WithURLParams(productURL, `op`, `buy`, `source`, c.Site())
-	c.Set(`productURL`, productURL)
 	c.Set(`fileName`, license.FileName())
 	return c.Render(`license`, err)
 }

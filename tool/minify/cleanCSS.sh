@@ -9,6 +9,9 @@ cssdalek \
   --word "${baseDir}template/backend/*.html"\
   --word "${baseDir}template/backend/*/*.html"\
   --word "${baseDir}template/backend/*/*/*.html"\
+  --word "${baseDir}${vendDir}github.com/coscms/webcore/library/formbuilder/templates/*.html"\
+  --word "${baseDir}${vendDir}github.com/coscms/webcore/library/formbuilder/templates/*/*.html"\
+  --word "${baseDir}${vendDir}github.com/coscms/webcore/library/formbuilder/templates/*/*/*.html"\
   --word "${baseDir}${vendDir}github.com/nging-plugins/*/template/backend/*.html"\
   --word "${baseDir}${vendDir}github.com/nging-plugins/*/template/backend/*/*.html"\
   --word "${baseDir}${vendDir}github.com/nging-plugins/*/template/backend/*/*/*.html"\
@@ -19,8 +22,10 @@ cssdalek \
   --word "${baseDir}public/assets/backend/js/bootstrap.editable/js/bootstrap-editable.js"\
   --word "${baseDir}public/assets/backend/js/dialog/bootstrap-dialog.js"\
   --word "${baseDir}public/assets/backend/js/fuelux/js/fuelux.js"\
+  --word "${baseDir}public/assets/backend/js/responsive-table/js/rwd-table.js"\
   --word "${baseDir}public/assets/backend/js/behaviour/*.js"\
   --word "${baseDir}public/assets/backend/js/behaviour/*/*.js"\
+  --include-class "list-unstyled"\
   --include-class "col-.*" > ${baseDir}public/assets/backend/js/bootstrap/dist/css/bootstrap.lite.min.css
 
 cssdalek \
@@ -28,6 +33,9 @@ cssdalek \
   --word "${baseDir}template/backend/*.html"\
   --word "${baseDir}template/backend/*/*.html"\
   --word "${baseDir}template/backend/*/*/*.html"\
+  --word "${baseDir}${vendDir}github.com/coscms/webcore/library/formbuilder/templates/*.html"\
+  --word "${baseDir}${vendDir}github.com/coscms/webcore/library/formbuilder/templates/*/*.html"\
+  --word "${baseDir}${vendDir}github.com/coscms/webcore/library/formbuilder/templates/*/*/*.html"\
   --word "${baseDir}${vendDir}github.com/nging-plugins/*/template/backend/*.html"\
   --word "${baseDir}${vendDir}github.com/nging-plugins/*/template/backend/*/*.html"\
   --word "${baseDir}${vendDir}github.com/nging-plugins/*/template/backend/*/*/*.html"\
@@ -52,5 +60,6 @@ cssdalek \
   --include-class "form-*"\
   --include-id "captchaImage"\
   --include-class "col-.*"\
+  --include-class "text-.*"\
   --include-class "progress-bar-.*"\
   --include-class "label-*" > ${baseDir}public/assets/backend/css/style.lite.min.css

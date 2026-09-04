@@ -3,7 +3,7 @@
   position: relative;
   overflow: hidden;
 }
-
+.file-preview-button .btn{margin-left:0}
 .file-preview-button input {
   position: absolute;
   top: 0;
@@ -11,18 +11,23 @@
   margin: 0;
   opacity: 0;
   -ms-filter: 'alpha(opacity=0)';
+  opacity: 0;
   cursor: pointer;
 }
 
 .file-preview-table {
   width: 100%;
-  margin-top: 20px;
 }
 
 .file-preview-table tr {
   border-top: 1px solid #eee;
 }
-
+.dark-theme .file-preview-table tr {
+  border-color: #272930;
+}
+.file-preview-table tr td.filethumb .fa{display: none;}
+.file-preview-table tr.state-error td.filethumb .fa-times{display: block;}
+.file-preview-table tr.state-success td.filethumb .fa-check{display: block;}
 .file-preview-table .file-preview-placeholder {
   width: 47px;
   height: 53px;

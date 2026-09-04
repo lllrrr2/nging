@@ -1,26 +1,31 @@
-{{with $.Get `fileInputConfig`}}
+{{- with $.Get `fileInputConfig` -}}
 {{- $k := Replace (Replace .name `[` `` -1) `]` `` -1 -}}
 {{- $subdir := .subdir | Default `` -}}
 {{- $urlValues := .urlValues -}}
 {{- $groupTitle := .title -}}
 {{- $v := .value -}}
+{{- $accept := .accept -}}
+{{- $fileType := .fileType -}}
+{{- $dataInput := .dataInput -}}
 <div class="input-group input-group-fileinput fileinput-{{$k}}">
 {{- if $groupTitle -}}
 <span class="input-group-addon">{{$groupTitle}}</span>
 {{- end -}}
+{{- if not .noPreview -}}
 <span class="input-group-btn preview-btn{{if not $v}} hidden{{end}}" id="{{$k}}ImagePreviewBtn">
 	<a class="btn btn-default no-padding" href="{{$v}}" target="_blank" title="{{`查看图片`|$.T}}"><img src="{{$v}}" class="scale" /></a>
 </span>
-<input type="text" class="form-control" name="{{.name}}" value="{{$v}}" maxlength="200" />
+{{- end -}}
+<input type="text" class="form-control fileinput-value" name="{{.name}}" value="{{$v}}" maxlength="200" />
 <label class="input-group-btn">
-	<input type="file" id="{{$k}}ImageFile" data-toggle="uploadPreviewer" data-preview-container="#{{$k}}ImagePreviewTableContainer" data-upload-url="{{BackendUploadURL $subdir $urlValues}}" data-preview-btn="#{{$k}}ImagePreviewBtn" />
+	<input type="file" id="{{$k}}ImageFile"{{if $accept}} accept="{{$accept}}"{{end}}{{if $dataInput}} data-input="{{$dataInput}}"{{end}} data-toggle="uploadPreviewer" data-preview-container="#{{$k}}ImagePreviewTableContainer" data-upload-url="{{$.UploadURL $subdir $urlValues}}" data-preview-btn="#{{$k}}ImagePreviewBtn" />
 </label>
 <label class="input-group-btn">
-	<a class="btn btn-info" href="javascript:;" data-toggle="finder">
+	<a class="btn btn-info" href="javascript:;" data-toggle="finder"{{if $fileType}} data-file-type="{{$fileType}}"{{end}}{{if $dataInput}} data-input="{{$dataInput}}"{{end}}>
 		<i class="fa fa-folder"></i>
 		{{`浏览`|$.T}}
 	</a>
 </label>
 </div>
 <div id="{{$k}}ImagePreviewTableContainer"></div>
-{{end}}
+{{- end -}}

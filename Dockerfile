@@ -1,22 +1,35 @@
 FROM alpine
+ARG TARGETARCH
+ARG TARGETVARIANT
 ARG VERSION
-ENV VERSION=${VERSION:-5.2.6}
-RUN apk update
-RUN apk upgrade
+ARG DATE
+ENV VERSION=${VERSION:-5.2.7}
 
-# RUN wget -c https://dl.webx.top/nging/v4.1.5/nging_linux_amd64.tar.gz -O /home/nging_linux_amd64.tar.gz
-COPY ./dist/packed/v${VERSION}/nging_linux_amd64.tar.gz /home/nging_linux_amd64.tar.gz
-RUN mkdir /home/nging_linux_amd64 && tar -zxvf /home/nging_linux_amd64.tar.gz -C /home/nging_linux_amd64 && rm -rf /home/nging_linux_amd64.tar.gz
+LABEL org.opencontainers.image.source=https://github.com/admpub/nging \
+      org.opencontainers.image.created=${DATE} \
+      org.opencontainers.image.version=${VERSION}
 
-WORKDIR /home/nging_linux_amd64
+#RUN apk update && apk upgrade
 
-# VOLUME [ "/home/nging_linux_amd64/data/cache", "/home/nging_linux_amd64/data/ftpdir", "/home/nging_linux_amd64/data/logs", "/home/nging_linux_amd64/data/sm2", "/home/nging_linux_amd64/myconfig", "/home/nging_linux_amd64/public" ]
+
+# RUN wget -c https://cdn.coscms.com/nging/v${VERSION}/nging_linux_${TARGETARCH}.tar.gz -O /home/nging.tar.gz
+# 对应 TARGETARCH 值通常为: amd64, arm64, arm, armv7 等（请确保构建产物与 TARGETARCH 一致）
+COPY ./dist/packed/v${VERSION}/nging_linux_${TARGETARCH}.tar.gz /home/nging.tar.gz
+
+# 创建 nging_linux_amd64 文件夹兼容旧版本
+RUN mkdir -p /home/nging_linux_amd64 && ln -s /home/nging_linux_amd64 /home/nging \
+    && tar -zxvf /home/nging.tar.gz -C /home/nging \
+    && rm -f /home/nging.tar.gz
+
+WORKDIR /home/nging
+
+# VOLUME [ "/home/nging/data/cache", "/home/nging/data/ftpdir", "/home/nging/data/logs", "/home/nging/data/sm2", "/home/nging/myconfig", "/home/nging/public" ]
 
 ENTRYPOINT [ "./nging" ]
 CMD [ "-p", "9999", "-c", "myconfig/config.yaml" ]
 
 # * build *
 # ./build-by-xgo.sh linux_amd64 min
-# docker build . -t "admpub/nging:latest"
+# docker build . --build-arg DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -t "admpub/nging:latest"
 # * test * 
 # docker run --rm -it -p "7770:9999" admpub/nging:latest

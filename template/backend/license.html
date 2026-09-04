@@ -2,6 +2,9 @@
 {{Extend "base"}}
 {{Block "description"}}{{$.T "%s授权" Version.Name}}{{/Block}}
 {{Block "title"}}{{$.T "%s授权" Version.Name}}{{/Block}}
+{{Block "headEnd"}}
+<link rel="stylesheet" href="{{AssetsURL}}/css/login.min.css?t={{BuildTime}}" />
+{{/Block}}
 {{Block "bodyAttr"}} class="texture"{{/Block}}
 {{Block "main"}}
 <div id="cl-wrapper" class="sign-up-container">
@@ -40,7 +43,7 @@
                         <li>{{"如果尚未购买，请点击："|$.T}}</li>
                     </ul>
                 </div>
-                <a class="btn btn-block btn-success btn-rad btn-lg" href="{{$.Stored.productURL}}" target="_blank">{{"立即购买"|$.T}}</a>
+                <a class="btn btn-block btn-success btn-rad btn-lg" href="{{BackendURL}}/license?jumpToProduct=1&op=buy" target="_blank">{{"立即购买"|$.T}}</a>
 				{{end}}
 				<a class="btn btn-block btn-default btn-rad btn-lg" href="{{BackendURL}}/logout">{{"退出登录"|$.T}}</a>
 			</div>

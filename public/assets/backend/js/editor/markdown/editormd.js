@@ -9,32 +9,18 @@
  * {@link       https://github.com/pandao/editor.md}
  * @updateTime  2015-06-09
  */
-
-;(function(factory) {
-    "use strict";
-    
-	// CommonJS/Node.js
-	if (typeof require === "function" && typeof exports === "object" && typeof module === "object")
-    { 
-        module.exports = factory;
-    }
-	else if (typeof define === "function")  // AMD/CMD/Sea.js
-	{
-        if (define.amd) // for Require.js
-        {
-            /* Require.js define replace */
-        } 
-        else 
-        {
-		    define(["jquery"], factory);  // for Sea.js
-        }
-	} 
-	else
-	{ 
-        window.editormd = factory();
-	}
-    
-}(function() {    
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+    // AMD. Register as an anonymous module.
+    define(['jquery'], factory);
+  } else if (typeof exports === 'object') {
+    // Node/CommonJS style for Browserify
+    module.exports = factory;
+  } else {
+    // Browser globals
+    factory(jQuery);
+  }
+}(function (jQuery) {
 
     /* Require.js assignment replace */
     
@@ -1861,7 +1847,9 @@
             
             return this;
         },
-        
+        toolbarHeight: function() {
+            return this.toolbar.height()>0?this.toolbar.height():37
+        },
         /**
          * 调整编辑器的尺寸和布局
          * Resize editor layout
@@ -1907,7 +1895,7 @@
 
                 if (settings.toolbar && !settings.readOnly) 
                 {
-                    codeMirror.css("margin-top", toolbar.height() + 1).height(editor.height() - toolbar.height());
+                    codeMirror.css("margin-top", this.toolbarHeight() + 1).height(editor.height() - this.toolbarHeight());
                 } 
                 else
                 {
@@ -1924,7 +1912,7 @@
                 
                 if (settings.toolbar && !settings.readOnly) 
                 {
-                    preview.css("top", toolbar.height() + 1);
+                    preview.css("top", this.toolbarHeight() + 1);
                 } 
                 else 
                 {
@@ -1937,7 +1925,7 @@
                 }
                 else
                 {                
-                    var previewHeight = (settings.toolbar && !settings.readOnly) ? editor.height() - toolbar.height() : editor.height();
+                    var previewHeight = (settings.toolbar && !settings.readOnly) ? editor.height() - this.toolbarHeight() : editor.height();
                     
                     preview.height(previewHeight);
                 }
@@ -2581,8 +2569,8 @@
                 background : null,
                 position   : "absolute",
                 width      : editor.width() / 2,
-                height     : (settings.autoHeight && !this.state.fullscreen) ? "auto" : editor.height() - toolbar.height(),
-                top        : (settings.toolbar)    ? toolbar.height() : 0
+                height     : (settings.autoHeight && !this.state.fullscreen) ? "auto" : editor.height() - this.toolbarHeight(),
+                top        : (settings.toolbar)    ? this.toolbarHeight() : 0
             });
 
             if (this.state.loaded)
@@ -3084,11 +3072,11 @@
         },
 
         link : function() {
-            this.executePlugin("linkDialog", "link-dialog/link-dialog");
+            this.executePlugin("linkDialog", "link-dialog/link-dialog.min");
         },
 
         "reference-link" : function() {
-            this.executePlugin("referenceLinkDialog", "reference-link-dialog/reference-link-dialog");
+            this.executePlugin("referenceLinkDialog", "reference-link-dialog/reference-link-dialog.min");
         },
 
         pagebreak : function() {
@@ -3105,7 +3093,7 @@
         },
 
         image : function() {
-            this.executePlugin("imageDialog", "image-dialog/image-dialog");
+            this.executePlugin("imageDialog", "image-dialog/image-dialog.min");
         },
         
         code : function() {
@@ -3121,15 +3109,15 @@
         },
 
         "code-block" : function() {
-            this.executePlugin("codeBlockDialog", "code-block-dialog/code-block-dialog");            
+            this.executePlugin("codeBlockDialog", "code-block-dialog/code-block-dialog.min");            
         },
 
         "preformatted-text" : function() {
-            this.executePlugin("preformattedTextDialog", "preformatted-text-dialog/preformatted-text-dialog");
+            this.executePlugin("preformattedTextDialog", "preformatted-text-dialog/preformatted-text-dialog.min");
         },
         
         table : function() {
-            this.executePlugin("tableDialog", "table-dialog/table-dialog");         
+            this.executePlugin("tableDialog", "table-dialog/table-dialog.min");         
         },
         
         datetime : function() {
@@ -3143,15 +3131,15 @@
         },
         
         emoji : function() {
-            this.executePlugin("emojiDialog", "emoji-dialog/emoji-dialog");
+            this.executePlugin("emojiDialog", "emoji-dialog/emoji-dialog.min");
         },
                 
         "html-entities" : function() {
-            this.executePlugin("htmlEntitiesDialog", "html-entities-dialog/html-entities-dialog");
+            this.executePlugin("htmlEntitiesDialog", "html-entities-dialog/html-entities-dialog.min");
         },
                 
         "goto-line" : function() {
-            this.executePlugin("gotoLineDialog", "goto-line-dialog/goto-line-dialog");
+            this.executePlugin("gotoLineDialog", "goto-line-dialog/goto-line-dialog.min");
         },
 
         watch : function() {    
@@ -3175,7 +3163,7 @@
         },
 
         help : function() {
-            this.executePlugin("helpDialog", "help-dialog/help-dialog");
+            this.executePlugin("helpDialog", "help-dialog/help-dialog.min");
         },
 
         info : function() {
@@ -4056,22 +4044,7 @@
     
     // CodeMirror / editor area themes
     // @1.5.0 rename -> editorThemes, old version -> themes
-    editormd.editorThemes = [
-        "default", "3024-day", "3024-night",
-        "ambiance", "ambiance-mobile",
-        "base16-dark", "base16-light", "blackboard",
-        "cobalt",
-        "eclipse", "elegant", "erlang-dark",
-        "lesser-dark",
-        "mbo", "mdn-like", "midnight", "monokai",
-        "neat", "neo", "night",
-        "paraiso-dark", "paraiso-light", "pastel-on-dark",
-        "rubyblue",
-        "solarized",
-        "the-matrix", "tomorrow-night-eighties", "twilight",
-        "vibrant-ink",
-        "xq-dark", "xq-light"
-    ];
+    editormd.editorThemes = ["ambiance", "ambiance-mobile","night"];
 
     editormd.loadPlugins = {};
     
@@ -4142,6 +4115,18 @@
      */
 
     editormd.loadScript = function(fileName, callback, into) {
+        if(typeof require == 'function') { // 兼容require.js
+            return require([fileName + ".js"],function(o){
+                if(o){
+                    var pos=fileName.lastIndexOf('/');
+                    switch(fileName.substring(pos+1)){
+                        case 'katex.min':window.katex=o;break;
+                        default:break;
+                    }
+                }
+                callback();
+            });
+        }
         
         into          = into     || "head";
         callback      = callback || function() {};
@@ -4597,7 +4582,8 @@
 
         return datefmt;
     };
-
+    
+    window.editormd = editormd;
     return editormd;
 
 }));

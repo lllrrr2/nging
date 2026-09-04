@@ -8,13 +8,13 @@
 
 osname=`uname -s`
 arch=`uname -m`
-version="5.2.7"
+version="5.2.10"
 
 if [ "$2" != "" ] && [ "$2" != "-" ]; then
     version="$2"
 fi
 
-url="https://img.nging.coscms.com/nging/v${version}/"
+url="https://cdn.coscms.com/nging/v${version}/"
 savedir="nging"
 
 case "$arch" in

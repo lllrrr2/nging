@@ -1,4 +1,15 @@
-(function(App){
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+    // AMD. Register as an anonymous module.
+    define(['app'], factory);
+  } else if (typeof exports === 'object') {
+    // Node/CommonJS style for Browserify
+    module.exports = factory;
+  } else {
+    // Browser globals
+    factory(App);
+  }
+}(function (App) {
     var Loader={
         data:{},
         libs:{},
@@ -64,7 +75,7 @@
         var loaded = {success:0,failure:0,total:files.length};
         if(successCallback||failureCallback){
             var timer = setInterval(function(){
-                //console.log(loaded)
+                //console.log(loaded,files.length)
                 if (loaded.success+loaded.failure < files.length) return;
                 clearInterval(timer);
                 if (loaded.success >= files.length) {
@@ -79,17 +90,18 @@
                 isCSS = (ext == ".css");
             if(Loader.fixFileName) name = Loader.fixFileName(splited);
             var link = (isCSS ? "href" : "src") + "='" + name + "'";
+            var tag, attr, closeTag;
+            if(isCSS){
+                tag = "link"; closeTag = "/>";
+                attr = ' type="text/css" rel="stylesheet"';
+            }else{
+                tag = "script"; closeTag = "></" + tag + ">";
+                attr = ' type="text/javascript"';
+            }
+            //console.warn(tag + "[" + link + "]")
             if (once && $(tag + "[" + link + "]").length > 0) {
                 loaded.success++;
                 continue;
-            }
-            var tag, attr, closeTag;
-            if(isCSS){
-                tag = "link"; closeTag = "/>"
-                attr = ' type="text/css" rel="stylesheet"';
-            }else{
-                tag = "script"; closeTag = "></" + tag + ">"
-                attr = ' type="text/javascript"';
             }
             attr += ' charset="utf-8" ';
             var ej = $("<" + tag + attr + link + closeTag);
@@ -106,6 +118,7 @@
                     loaded.success++;
                 };
             }
+            //console.info(location,tag,ej.attr('src')||ej.attr('href'))
             if (location == "head") {
                 if (typeof(Loader.data.include.after[tag]) != 'undefined') {
                     Loader.data.include.after[tag].after(ej);
@@ -119,7 +132,6 @@
                 }
             }
             try{
-                //console.log(location,tag,ej.attr('src'))
                 $(location).append(ej);
                 loaded.success++;
             }catch(err){
@@ -143,9 +155,9 @@
                 if (typeof callback['error'] != "undefined") failureCallback = callback['error'];
                 else if (typeof callback['failure'] != "undefined") failureCallback = callback['failure'];
             } else if (onloadCallback != null) {
-                successCallback = function() { 
-                    onloadCallback();
-                    callback();
+                successCallback = function() {
+                    onloadCallback.call(this,arguments);
+                    callback.call(this,arguments);
                 };
             } else {
                 successCallback = callback;
@@ -165,11 +177,23 @@
         if (!js) return;
         switch (typeof(js)) {
         case 'string':
+            if(typeof require == 'function') return require([Loader.fullURL(js)],onloadCallback);
             Loader.include(Loader.fullURL(js),null,once,onloadCallback,failureCallback);
             break;
         default:
             if (typeof(js.length) == 'undefined') return;
             var jss = [];
+            if(typeof require == 'function') {
+                for (var i = 0; i < js.length; i++) {
+                    var jsFullPath = Loader.fullURL(js[i]);
+                    if(String(js[i]).endsWith('.css')){
+                        jss.push('css!'+jsFullPath);
+                        continue;
+                    }
+                    jss.push(jsFullPath);
+                }
+                return require(jss,onloadCallback);
+            }
             for (var i = 0; i < js.length; i++) {
                 jss.push(Loader.fullURL(js[i]));
             }
@@ -177,4 +201,5 @@
         }
     };
     App.loader=Loader;
-})(App);
+    return Loader;
+}));

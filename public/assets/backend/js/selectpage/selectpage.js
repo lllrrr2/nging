@@ -189,10 +189,12 @@
 		 * }
 		 */
 		eAjaxSuccess: undefined,
+		eAjaxError: undefined,
 		eAjaxMethod: undefined, // POST/GET
 		defaultWidth: 150,
 		defaultZindex: 1101,
 		containerWidth: null,
+		overflowHide: false,
 		defaultAjaxResult: { "list": [], "pageSize": 10, "pageNumber": 1, "totalRow": 0, "totalPage": 0 },
 		/**
 		 * Close selected item tag callback (multiple mode)
@@ -650,6 +652,9 @@
 			if (p.multiple) elem.container.addClass(css.disabled)
 			else elem.combo_input.addClass(css.input_off)
 		}
+		if (p.overflowHide) {
+			elem.container.addClass(css.container+'_overflow')
+		}
 
 		// set outer box width
 		if (!p.containerWidth) {
@@ -667,10 +672,7 @@
 
 		//main box in multiple mode
 		elem.element_box = $('<ul>').addClass(css.element_box)
-		if (p.multiple && p.multipleControlbar)
-			elem.control = $('<div>').addClass(css.control_box)
-		//result list box
-		elem.result_area = $('<div>').addClass(css.re_area)
+		if (p.multiple && p.multipleControlbar) elem.control = $('<div>').addClass(css.control_box)
 		//pagination bar
 		if (p.pagination) elem.navi = $('<div>').addClass('sp_pagination').append('<ul>')
 		elem.results = $('<ul>').addClass(css.results)
@@ -690,6 +692,10 @@
 			name: input_name + namePrefix,
 			id: input_id + namePrefix
 		})
+		var that = this;
+		elem.hidden.on('change', function () {
+			that.setInitRecord(true);
+		})
 
 		// 2. DOM element put
 		elem.container.append(elem.hidden)
@@ -697,6 +703,8 @@
 			elem.container.append(elem.button)
 			elem.button.append(elem.dropdown)
 		}
+		//result list box
+		elem.result_area = $('<div>').addClass(css.re_area).hide()
 		$(document.body).append(elem.result_area)
 		elem.result_area.append(elem.results)
 		if (p.pagination) elem.result_area.append(elem.navi)
@@ -799,13 +807,22 @@
 					success: function (json) {
 						var d = null
 						if (p.eAjaxSuccess && $.isFunction(p.eAjaxSuccess)) {
-							d = p.eAjaxSuccess(json)
+							d = p.eAjaxSuccess.call(self, json, 'init')
+							if (d===false) return
+							if (typeof d == 'string') {
+								self.showMessage(d, true)
+								return
+							}
 						}
 						if (!d) d = p.defaultAjaxResult
 						self.afterInit(self, d.list)
 					},
 					error: function (jqXHR, textStatus, errorThrown) {
-						self.ajaxErrorNotify(self, errorThrown)
+						if (p.eAjaxError && $.isFunction(p.eAjaxError)) {
+							p.eAjaxError.call(self, jqXHR, textStatus, errorThrown, 'init')
+						}else{
+							self.ajaxErrorNotify(errorThrown)
+						}
 					}
 				})
 			}
@@ -1059,25 +1076,25 @@
 	/**
 	 * Page bar button event bind
 	 */
-	SelectPage.prototype.ePaging = function () {
+	SelectPage.prototype.ePaging = function (offsetMode) {
 		var self = this
 		if (!self.option.pagination) return
 		self.elem.navi.find('li.csFirstPage').off('click').on('click', function (ev) {
 			//$(self.elem.combo_input).focus()
 			ev.preventDefault()
-			self.firstPage(self)
+			self.firstPage(self, offsetMode)
 		})
 
 		self.elem.navi.find('li.csPreviousPage').off('click').on('click', function (ev) {
 			//$(self.elem.combo_input).focus()
 			ev.preventDefault()
-			self.prevPage(self)
+			self.prevPage(self, offsetMode)
 		})
 
 		self.elem.navi.find('li.csNextPage').off('click').on('click', function (ev) {
 			//$(self.elem.combo_input).focus()
 			ev.preventDefault()
-			self.nextPage(self)
+			self.nextPage(self, offsetMode)
 		})
 
 		self.elem.navi.find('li.csLastPage').off('click').on('click', function (ev) {
@@ -1089,25 +1106,27 @@
 
 	/**
 	 * Ajax request fail
-	 * @param {Object} self
 	 * @param {string} errorThrown
 	 */
-	SelectPage.prototype.ajaxErrorNotify = function (self, errorThrown) {
-		self.showMessage(self.message.ajax_error)
+	SelectPage.prototype.ajaxErrorNotify = function (errorThrown) {
+		this.showMessage(errorThrown||this.message.ajax_error)
 	}
 
 	/**
 	 * Message box
-	 * @param {Object} self
 	 * @param msg {string} the text need to show
 	 */
-	SelectPage.prototype.showMessage = function (self, msg) {
+	SelectPage.prototype.showMessage = function (msg, slient) {
 		if (!msg) return
+		var self = this
 		var msgLi = '<li class="' + self.css_class.message_box + '"><i class="sp-iconfont if-warning"></i> ' + msg + '</li>'
-		self.elem.results.empty().append(msgLi).show()
-		self.calcResultsSize(self)
-		self.setOpenStatus(self, true)
-		self.elem.control.hide()
+		self.elem.results.empty().append(msgLi)
+		if(!slient) {
+			self.elem.results.show()
+			self.calcResultsSize(self)
+			self.setOpenStatus(self, true)
+		}
+		if (self.elem.control) self.elem.control.hide()
 		if (self.option.pagination) self.elem.navi.hide()
 	}
 
@@ -1291,10 +1310,9 @@
 
 		self.abortAjax(self)
 		//self.setLoading(self)
-		var which_page_num = self.prop.current_page || 1
 
-		if (typeof self.option.data == 'object') self.searchForJson(self, q_word, which_page_num)
-		else self.searchForDb(self, q_word, which_page_num)
+		if (typeof self.option.data == 'object') self.searchForJson(self, q_word)
+		else self.searchForDb(self, q_word)
 	}
 
 	/**
@@ -1312,20 +1330,26 @@
 	 * Search for ajax
 	 * @param {Object} self
 	 * @param {Array} q_word - query keyword
-	 * @param {number} which_page_num - target page number
 	 */
-	SelectPage.prototype.searchForDb = function (self, q_word, which_page_num) {
+	SelectPage.prototype.searchForDb = function (self, q_word) {
 		var p = self.option
 		if (!p.eAjaxSuccess || !$.isFunction(p.eAjaxSuccess)) self.hideResults(self)
 		var _paramsFunc = p.params, _params = {}, searchKey = p.searchField
-		//when have new query keyword, then reset page number to 1.
-		if (q_word.length && q_word[0] && q_word[0] !== self.prop.prev_value) which_page_num = 1
 		var _orgParams = {
 			q_word: q_word,
-			pageNumber: which_page_num,
 			pageSize: p.pageSize,
 			andOr: p.andOr,
 			searchTable: p.dbTable
+		}
+		//when have new query keyword, then reset page number to 1.
+		var _needReset = (q_word.length && q_word[0] && q_word[0] !== self.prop.prev_value);
+		if('pos_offset' in self.prop) {
+			if (_needReset) self.prop.pos_offset = '';
+			_orgParams.offset = self.prop.pos_offset;
+		} else {
+			if(!('current_page' in self.prop) || !self.prop.current_page) self.prop.current_page = 1;
+			if (_needReset) self.prop.current_page = 1;
+			_orgParams.pageNumber = self.prop.current_page;
 		}
 		if (p.orderBy !== false) _orgParams.orderBy = p.orderBy
 		_orgParams[searchKey] = q_word[0]
@@ -1343,17 +1367,33 @@
 			success: function (returnData) {
 				if (!returnData || !$.isPlainObject(returnData)) {
 					self.hideResults(self)
-					self.ajaxErrorNotify(self, errorThrown)
+					self.ajaxErrorNotify()
 					return
 				}
 				var data = {}, json = {}
 				try {
-					data = p.eAjaxSuccess(returnData)
+					data = p.eAjaxSuccess.call(self, returnData, 'search')
+					if (data===false) return
+					if (typeof data == 'string') {
+						self.showMessage(data)
+						return
+					}
 					if (!data) data = p.defaultAjaxResult
 					json.originalResult = data.list
-					json.cnt_whole = data.totalRow
+					if('next' in data){
+						json.pos_next = data.next
+						json.pos_prev = data.prev
+						json.pos_curr = data.curr
+						json.pos_isFirst = data.isFirst
+						json.pos_hasNext = data.hasNext
+						json.pos_hasPrev = data.hasPrev
+					}else{
+						json.cnt_whole = data.totalRow
+					}
+					//console.dir(data)
 				} catch (e) {
-					self.showMessage(self, self.message.ajax_error)
+					console.error(e);
+					self.showMessage(self.message.ajax_error)
 					return
 				}
 
@@ -1377,12 +1417,16 @@
 						})
 					}
 				}
-				self.prepareResults(self, json, q_word, which_page_num)
+				self.prepareResults(self, json, q_word, self.prop.current_page || 1)
 			},
 			error: function (jqXHR, textStatus, errorThrown) {
 				if (textStatus != 'abort') {
 					self.hideResults(self)
-					self.ajaxErrorNotify(self, errorThrown)
+					if (p.eAjaxError && $.isFunction(p.eAjaxError)) {
+						p.eAjaxError.call(self, jqXHR, textStatus, errorThrown, 'search')
+					}else{
+						self.ajaxErrorNotify(errorThrown)
+					}
 				}
 			},
 			complete: function () {
@@ -1395,9 +1439,8 @@
 	 * Search for json data source
 	 * @param {Object} self
 	 * @param {Array} q_word
-	 * @param {number} which_page_num
 	 */
-	SelectPage.prototype.searchForJson = function (self, q_word, which_page_num) {
+	SelectPage.prototype.searchForJson = function (self, q_word) {
 		var p = self.option, matched = [], esc_q = [], sorted = [], json = {}, i = 0, arr_reg = []
 
 		//query keyword filter
@@ -1462,6 +1505,7 @@
 			return
 		}
 		*/
+		var which_page_num = self.prop.current_page || 1;
 		json.cnt_whole = sorted.length
 		//page_move used to distinguish between init plugin or page moving
 		if (!self.prop.page_move) {
@@ -1561,7 +1605,7 @@
 	 * @param {number} which_page_num - target page number
 	 */
 	SelectPage.prototype.prepareResults = function (self, json, q_word, which_page_num) {
-		if (self.option.pagination) self.setNavi(self, json.cnt_whole, json.cnt_page, which_page_num)
+		if (self.option.pagination) self.setNavi(self, json, which_page_num)
 
 		if (!json.keyField) json.keyField = false
 
@@ -1581,8 +1625,9 @@
 	 * @param {number} cnt_page
 	 * @param {number} page_num - current page number
 	 */
-	SelectPage.prototype.setNavi = function (self, cnt_whole, cnt_page, page_num) {
-		var msg = self.message
+	SelectPage.prototype.setNavi = function (self, json, page_num) {
+		var msg = self.message, offsetMode = ('pos_next' in json);
+		//console.log('setNavi', json)
 		/**
 		 * build pagination bar
 		 */
@@ -1600,27 +1645,52 @@
 
 				pagebar.append('<li class="csFirstPage" title="' + msg.first_title + '" ><a href="javascript:void(0);"> <i class="' + iconFist + '"></i> </a></li>')
 				pagebar.append('<li class="csPreviousPage" title="' + msg.prev_title + '" ><a href="javascript:void(0);"><i class="' + iconPrev + '"></i></a></li>')
-				//pagination information
-				pagebar.append('<li class="pageInfoBox"><a href="javascript:void(0);"> ' + updatePageInfo() + ' </a></li>')
+
+				if(!offsetMode) {
+					//pagination information
+					pagebar.append('<li class="pageInfoBox"><a href="javascript:void(0);"> ' + updatePageInfo() + ' </a></li>')
+				}
 
 				pagebar.append('<li class="csNextPage" title="' + msg.next_title + '" ><a href="javascript:void(0);"><i class="' + iconNext + '"></i></a></li>')
-				pagebar.append('<li class="csLastPage" title="' + msg.last_title + '" ><a href="javascript:void(0);"> <i class="' + iconLast + '"></i> </a></li>')
+				if(!offsetMode) pagebar.append('<li class="csLastPage" title="' + msg.last_title + '" ><a href="javascript:void(0);"> <i class="' + iconLast + '"></i> </a></li>')
 				pagebar.show()
 			} else {
-				pagebar.find('li.pageInfoBox a').html(updatePageInfo())
+				if(!offsetMode) pagebar.find('li.pageInfoBox a').html(updatePageInfo())
 			}
 		}
 
-		var pagebar = self.elem.navi.find('ul'),
-			last_page = Math.ceil(cnt_whole / self.option.pageSize); //calculate total page
-		if (last_page === 0) page_num = 0
-		else {
-			if (last_page < page_num) page_num = last_page
-			else if (page_num === 0) page_num = 1
+		var pagebar = self.elem.navi.find('ul'), hasPrev = false, hasNext = false, hasFirst = false, hasLast = false;
+		if(offsetMode){ // json.pos_next json.pos_prev json.pos_curr
+			self.prop.pos_next = json.pos_next;
+			self.prop.pos_prev = json.pos_prev;
+			self.prop.pos_curr = json.pos_curr;
+			self.prop.pos_hasPrev = json.pos_hasPrev;
+			self.prop.pos_hasNext = json.pos_hasNext;
+			self.prop.pos_isFirst = json.pos_isFirst;
+			hasNext = json.pos_hasNext;
+			hasFirst = !json.pos_isFirst;
+			hasPrev = json.pos_hasPrev||hasFirst;
+			buildPageNav(self, pagebar, '', '')
+			pagebar.attr('class','sp_mode_position');
+			if (hasPrev || hasNext || hasFirst) self.ePaging(offsetMode); //pagination event bind
+		}else{
+			pagebar.removeAttr('class');
+			var cnt_whole = json.cnt_whole || 0, page_num = page_num || 1;
+			var last_page = Math.ceil(cnt_whole / self.option.pageSize); //calculate total page
+			if (last_page === 0) page_num = 0
+			else {
+				if (last_page < page_num) page_num = last_page
+				else if (page_num === 0) page_num = 1
+			}
+			self.prop.current_page = page_num;//update current page number
+			self.prop.max_page = last_page;//update page count
+			hasPrev = page_num > 1;
+			hasNext = page_num < last_page && last_page > 0;
+			hasFirst = hasPrev;
+			hasLast = hasNext;
+			buildPageNav(self, pagebar, page_num, last_page)
+			if (last_page > 1) self.ePaging(); //pagination event bind
 		}
-		self.prop.current_page = page_num;//update current page number
-		self.prop.max_page = last_page;//update page count
-		buildPageNav(self, pagebar, page_num, last_page)
 
 		//update paging status
 		var dClass = 'disabled',
@@ -1629,23 +1699,27 @@
 			next = pagebar.find('li.csNextPage'),
 			last = pagebar.find('li.csLastPage')
 		//first and previous
-		if (page_num === 1 || page_num === 0) {
-			if (!first.hasClass(dClass)) first.addClass(dClass)
-			if (!previous.hasClass(dClass)) previous.addClass(dClass)
-		} else {
-			if (first.hasClass(dClass)) first.removeClass(dClass)
-			if (previous.hasClass(dClass)) previous.removeClass(dClass)
+		if(hasFirst){
+			if(first.hasClass(dClass)) first.removeClass(dClass)
+		}else{
+			if(!first.hasClass(dClass)) first.addClass(dClass)
+		}
+		if(hasPrev){
+			if(previous.hasClass(dClass)) previous.removeClass(dClass)
+		}else{
+			if(!previous.hasClass(dClass)) previous.addClass(dClass)
 		}
 		//next and last
-		if (page_num === last_page || last_page === 0) {
-			if (!next.hasClass(dClass)) next.addClass(dClass)
-			if (!last.hasClass(dClass)) last.addClass(dClass)
-		} else {
-			if (next.hasClass(dClass)) next.removeClass(dClass)
-			if (last.hasClass(dClass)) last.removeClass(dClass)
+		if (hasNext){
+			if(next.hasClass(dClass)) next.removeClass(dClass)
+		}else{
+			if(!next.hasClass(dClass)) next.addClass(dClass)
 		}
-
-		if (last_page > 1) self.ePaging(); //pagination event bind
+		if (hasLast) {
+			if(last.hasClass(dClass)) last.removeClass(dClass)
+		} else {
+			if(!last.hasClass(dClass)) last.addClass(dClass)
+		}
 	}
 
 	/**
@@ -1661,7 +1735,7 @@
 			var selectedSize = el.element_box.find('li.selected_tag').length
 			if (selectedSize > 0 && selectedSize >= p.maxSelectLimit) {
 				var msg = self.message.max_selected
-				self.showMessage(self, msg.replace(self.template.msg.maxSelectLimit, p.maxSelectLimit))
+				self.showMessage(msg.replace(self.template.msg.maxSelectLimit, p.maxSelectLimit))
 				return
 			}
 		}
@@ -1686,11 +1760,11 @@
 					itemThumb = arr_candidate[i].thumb
 				}
 				var itemHtml = '<span class="sp_item_text">'+itemText+'</span>';
-				if(itemThumb) itemHtml = '<img class="sp_item_thumb" src="'+itemThumb+'" />'+itemHtml;
+				if(itemThumb) itemHtml = '<div class="sp_item_thumb_lg" style="display:none"><img src="'+itemThumb+'" /></div><img class="sp_item_thumb" src="'+itemThumb+'" />'+itemHtml;
 				var list = $('<li>').html(itemHtml).attr({
 					pkey: arr_primary_key[i]
 				})
-				if (!p.formatItem) list.attr('title', itemText)
+				if (!p.formatItem) list.children('.sp_item_text').attr('title', itemText)
 
 				//Set selected item highlight
 				if ($.inArray(arr_primary_key[i].toString(), keyArr) !== -1) {
@@ -1700,24 +1774,22 @@
 				list.data('dataObj', json.originalResult[i])
 				el.results.append(list)
 				if(itemThumb){
+					var offsetLeft=el.results.data('parent-offset-left');
 					list.on('mouseover',function(){
 						var $img=$(this).children('.sp_item_thumb');
-						var $box=$('<div class="sp_item_thumb_lg"><img src="'+$img.attr('src')+'" /></div>');
-						$(this).prepend($box)
+						var $box=$(this).children('.sp_item_thumb_lg');
 						var imgHalfHeight=$box.height()/2-$img.height()/2;
-						var css={left:-$box.width(),top:$img.position().top-imgHalfHeight}
-						var pos=$(this).closest('.sp_result_area').position();
-						var leftOffset=pos.left;
-						if(leftOffset<$box.width()) {
-							var maxWidth=leftOffset;
+						var css={left:-$box.width(),top:$img.position().top-imgHalfHeight};
+						if(offsetLeft<$box.width()) {
+							var maxWidth=offsetLeft;
 							$box.children('img').css({maxWidth:maxWidth})
 							css.left=-$box.width();
 							imgHalfHeight=$box.height()/2-$img.height()/2;
-							css.top=$img.position().top-imgHalfHeight;
+							css.top=$img.offset().top-imgHalfHeight;
 						}
-						$box.css(css)
+						$box.css(css).show();
 					}).on('mouseout',function(){
-						$(this).children('.sp_item_thumb_lg').remove();
+						$(this).children('.sp_item_thumb_lg').hide();
 					})
 				}
 			}
@@ -1727,6 +1799,10 @@
 			el.results.append(li)
 		}
 		el.results.show()
+
+		var parent = el.results.closest('.sp_result_area');
+		var offsetLeft = parent.offset().left||parent.left;
+		el.results.data('parent-offset-left',offsetLeft);
 
 		if (p.multiple && p.multipleControlbar) el.control.show()
 		if (p.pagination) el.navi.show()
@@ -1860,7 +1936,14 @@
 	 * Go fist page
 	 * @param {Object} self
 	 */
-	SelectPage.prototype.firstPage = function (self) {
+	SelectPage.prototype.firstPage = function (self, offsetMode) {
+		if (offsetMode) {
+			if (self.prop.pos_offset === '') return;
+			self.prop.pos_offset = '';
+			self.prop.page_move = true
+			self.suggest(self)
+			return
+		}
 		if (self.prop.current_page > 1) {
 			self.prop.current_page = 1
 			self.prop.page_move = true
@@ -1872,7 +1955,14 @@
 	 * Go previous page
 	 * @param {Object} self
 	 */
-	SelectPage.prototype.prevPage = function (self) {
+	SelectPage.prototype.prevPage = function (self, offsetMode) {
+		if (offsetMode) {
+			if (self.prop.pos_offset === self.prop.pos_prev) return;
+			self.prop.pos_offset = self.prop.pos_prev;
+			self.prop.page_move = true
+			self.suggest(self)
+			return
+		}
 		if (self.prop.current_page > 1) {
 			self.prop.current_page--
 			self.prop.page_move = true
@@ -1884,7 +1974,14 @@
 	 * Go next page
 	 * @param {Object} self
 	 */
-	SelectPage.prototype.nextPage = function (self) {
+	SelectPage.prototype.nextPage = function (self, offsetMode) {
+		if (offsetMode) {
+			if (self.prop.pos_offset === self.prop.pos_next) return;
+			self.prop.pos_offset = self.prop.pos_next;
+			self.prop.page_move = true
+			self.suggest(self)
+			return
+		}
 		if (self.prop.current_page < self.prop.max_page) {
 			self.prop.current_page++
 			self.prop.page_move = true
@@ -2043,6 +2140,7 @@
 		self.prop.prev_value = ''
 		self.prop.selected_text = ''
 		self.prop.current_page = 1
+		if('pos_offset' in self.prop) delete self.prop.pos_offset;
 	}
 
 	/**
@@ -2084,10 +2182,11 @@
 		var tmp = self.template.tag.content, tag, text = item.text, p = self.option
 		if (p.formatItem && $.isFunction(p.formatItem)) text = p.formatItem(data)
 		var textHtml = '<span class="sp_item_text">'+text+'</span>';
-		if (p.thumbField && p.thumbField in data) textHtml = '<img class="sp_item_thumb" src="'+data[p.thumbField]+'" />'+textHtml
+		if (p.thumbField && p.thumbField in data) textHtml = '<div class="sp_item_thumb_lg" style="display:none"><img src="'+data[p.thumbField]+'" /></div><img class="sp_item_thumb" src="'+data[p.thumbField]+'" />'+textHtml
 		tmp = tmp.replace(self.template.tag.textKey, textHtml)
 		tmp = tmp.replace(self.template.tag.valueKey, item.value)
 		tag = $(tmp)
+		if (!p.formatItem) tag.children('.sp_item_text').attr('title',text);
 		tag.prop('draggable',true);
 		tag.data('dataObj', data);
 		tag.children('*').prop('draggable',false);
@@ -2099,14 +2198,14 @@
 				self.tagValuesSet(self)
 			});
 		}
+		var parent = tag.closest('.sp_container_combo');
+		var parentOffsetLeft = parent.offset().left||parent.left;
 		tag.children('.sp_item_thumb').on('mouseover',function(){
 			var $img=$(this);
-			var $box=$('<div class="sp_item_thumb_lg"><img src="'+$img.attr('src')+'" /></div>');
-			$(this).before($box)
+			var $box=$(this).prev('.sp_item_thumb_lg');
 			var leftOffset=$(this).position().left-$box.width()-$img.width()/2;
 			var topOffset=$img.position().top-($box.height()/2-$img.height()/2);
-			var pos=$(this).closest('.sp_container_combo').offset();
-			var leftAbsOffset=pos.left+$(this).position().left-$img.width()/2;
+			var leftAbsOffset=parentOffsetLeft+$(this).position().left-$img.width()/2;
 			if(leftAbsOffset<$box.width()) {
 				var maxWidth=leftAbsOffset;
 				$box.children('img').css({maxWidth:maxWidth})
@@ -2114,9 +2213,9 @@
 				topOffset=$img.position().top-($box.height()/2-$img.height()/2);
 			}
 			var css={left:leftOffset,top:topOffset}
-			$box.css(css)
+			$box.css(css).show();
 		}).on('mouseout',function(){
-			$(this).prev('.sp_item_thumb_lg').remove();
+			$(this).prev('.sp_item_thumb_lg').hide();
 		})
 	}
 
@@ -2309,10 +2408,12 @@ function draggable(node,ondrop) {
 	 */
 	function Plugin(option) {
 		return this.each(function () {
-			var $this = $(this),
-				data = $this.data(SelectPage.dataKey),
-				params = $.extend({}, defaults, $this.data(), data && data.option, typeof option === 'object' && option)
-			if (!data) $this.data(SelectPage.dataKey, (data = new SelectPage(this, params)))
+			var $this = $(this), data = $this.data(SelectPage.dataKey);
+			if (!data) {
+				var params = $.extend({}, defaults, $this.data(), data && data.option, typeof option === 'object' && option);
+				data = new SelectPage(this, params);
+				$this.data(SelectPage.dataKey, data);
+			}
 		})
 	}
 

@@ -81,7 +81,7 @@ func StorageFile(ctx echo.Context) error {
 			}
 			return ctx.JSON(data)
 		}
-		rules, err := mgr.GetCORSRules()
+		rules, err := mgr.GetCORSRules(ctx)
 		ctx.Set(`rules`, rules)
 		ctx.Set(`data`, m.NgingCloudStorage)
 		ctx.Set(`title`, ctx.T(`配置CORS规则`))
@@ -165,7 +165,11 @@ func StorageFile(ctx echo.Context) error {
 			if len(ppath) == 0 {
 				continue
 			}
+			isDir := strings.HasSuffix(ppath, `/`)
 			ppath = path.Clean(ppath)
+			if isDir && !strings.HasSuffix(ppath, `/`) {
+				ppath += `/`
+			}
 			err = mgr.Remove(ctx, ppath)
 			if err != nil {
 				common.SendFail(ctx, err.Error())

@@ -3,12 +3,14 @@
 {{Block "description"}}{{"安装向导"|$.T}}{{/Block}}
 {{Block "title"}}{{"安装向导"|$.T}}{{/Block}}
 {{Block "head"}}
-<link href="{{AssetsURL}}/js/fuelux/css/fuelux.min.css" rel="stylesheet">
-<link rel="stylesheet" type="text/css" href="{{AssetsURL}}/js/jquery.nanoscroller/nanoscroller.css" />
-<link rel="stylesheet" type="text/css" href="{{AssetsURL}}/js/bootstrap.slider/css/slider.css" />
-<!-- <link rel="stylesheet" type="text/css" href="{{AssetsURL}}/css/form/checkbox.min.css" /> -->
+<link href="{{AssetsURL}}/js/fuelux/css/fuelux.min.css?t={{BuildTime}}" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="{{AssetsURL}}/js/jquery.nanoscroller/nanoscroller.css?t={{BuildTime}}" />
+<link rel="stylesheet" type="text/css" href="{{AssetsURL}}/js/bootstrap.slider/css/slider.css?t={{BuildTime}}" />
 {{/Block}}
 {{Block "themeColor"}}#26262E{{/Block}}
+{{Block "headEnd"}}
+<link rel="stylesheet" href="{{AssetsURL}}/css/login.min.css?t={{BuildTime}}" />
+{{/Block}}
 {{Block "bodyAttr"}} class="texture"{{/Block}}
 {{Block "main"}}{{$data := $.Stored.data}}
 <div id="cl-wrapper" class="login-container">
@@ -103,15 +105,25 @@
 									</div>
 									<div class="form-group">
 										<div class="col-sm-12">
+											{{- $supportedUTF8 := false -}}
 											<div class="input-group" data-toggle="tooltip" title="{{`字符集`|$.T}}">
 												<span class="input-group-addon"><i class="fa fa-language"></i></span>
-												<select name="charset" id="database-charset" class="form-control">{{$charset:=$data.Charset}}
-													<option value="utf8mb4"{{if eq $charset `utf8mb4`}} selected{{end}}>utf8mb4</option>
-													<option value="utf8"{{if eq $charset `utf8`}} selected{{end}}>utf8</option>
+												<select name="charset" id="database-charset" class="form-control">
+													{{- $charset := $data.Charset -}}
+													{{- range $csk, $csv := $.Stored.dbCharsets -}}
+													{{- if not $csv.H.disabled -}}
+													<option value="{{$csv.K}}"{{if eq $charset $csv.K}} selected{{end}}>{{$csv.V|Default $csv.K}}</option>
+													{{- if eq $csv.K `utf8` -}}{{- $supportedUTF8 = true -}}{{- end -}}
+													{{- end -}}
+													{{- end -}}
 												</select>
 											</div>
 											<div class="help-block text-muted">
+												{{- if $supportedUTF8 -}}
 												{{`如果MySQL数据库的版本低于5.7，请选择utf8`|$.T}}
+												{{- else -}}
+												{{`需要MySQL数据库的版本≥8.0`|$.T}}
+												{{- end -}}
 											</div>
 										</div>
 									</div>
@@ -257,10 +269,10 @@
 		</div>
 	</div>
 </script>
-<script type="text/javascript" src="{{AssetsURL}}/js/jquery.parsley/parsley.min.js"></script>
-<script type="text/javascript" src="{{AssetsURL}}/js/jquery.parsley/i18n/{{$.Lang}}.js" charset="utf-8"></script>
-<script type="text/javascript" src="{{AssetsURL}}/js/fuelux/js/fuelux.min.js"></script>
-<script type="text/javascript" src="{{AssetsURL}}/js/bootstrap.slider/js/bootstrap-slider.min.js"></script>
+<script type="text/javascript" src="{{AssetsURL}}/js/jquery.parsley/parsley.min.js?t={{BuildTime}}"></script>
+<script type="text/javascript" src="{{AssetsURL}}/js/jquery.parsley/i18n/{{$.Lang}}.js?t={{BuildTime}}" charset="utf-8"></script>
+<script type="text/javascript" src="{{AssetsURL}}/js/fuelux/js/fuelux.min.js?t={{BuildTime}}"></script>
+<script type="text/javascript" src="{{AssetsURL}}/js/bootstrap.slider/js/bootstrap-slider.min.js?t={{BuildTime}}"></script>
 <script type="text/javascript">
 function fetchProgress() {
 	if ($('#install-progress').length < 1) {

@@ -1,3 +1,15 @@
+(function (factory) {
+  if (typeof define === 'function' && define.amd) {
+    // AMD. Register as an anonymous module.
+    define(['app','loader'], factory);
+  } else if (typeof exports === 'object') {
+    // Node/CommonJS style for Browserify
+    module.exports = factory;
+  } else {
+    // Browser globals
+    factory(App);
+  }
+}(function (App) {
 App.loader.libs.editormdPreview = [
 	'#editor/markdown/lib/marked.min.js', 
 	'#editor/markdown/lib/prettify.min.js', 
@@ -15,6 +27,10 @@ App.loader.libs.codemirror = [
 	'#editor/markdown/lib/codemirror/modes.min.js', 
 	'#editor/markdown/lib/codemirror/addons.min.js',
 	'#editor/markdown/lib/codemirror/addon/hint/show-hint.js'
+];
+App.loader.libs.editable = [
+	'#bootstrap.editable/css/bootstrap-editable.min.css',
+	'#bootstrap.editable/js/bootstrap-editable.min.js'
 ];
 App.loader.libs.editormd = ['#editor/markdown/css/editormd.min.css', '#editor/markdown/css/editormd.preview.min.css', '#editor/markdown/editormd.min.js'];
 App.loader.libs.flowChart = ['#editor/markdown/lib/flowchart.min.js'];
@@ -43,20 +59,21 @@ App.loader.libs.select2ex = ['#behaviour/page/select2.min.js'];
 App.loader.libs.selectPage = ['#selectpage/selectpage.css','#selectpage/selectpage.min.js'];
 App.loader.libs.cascadeSelect = ['#behaviour/page/cascade-select.min.js'];
 App.loader.libs.forms = ['#behaviour/page/forms.min.js'];
-App.loader.libs.jqueryui = ['#jquery.ui/jquery-ui.custom.min.js','#jquery.ui/jquery-ui.touch-punch.min.js'];
+App.loader.libs.jqueryui = ['#jquery.ui/css/jquery-ui.custom.min.css','#jquery.ui/jquery-ui.custom.min.js','#jquery.ui/jquery-ui.touch-punch.min.js'];
 App.loader.libs.dropzone = ['#jquery.ui/css/dropzone.min.css','#dropzone/dropzone.min.js'];
 App.loader.libs.loadingOverlay = ['#loadingoverlay/loadingoverlay.min.js'];
 App.loader.libs.dateRangePicker = ['#daterangepicker/daterangepicker.min.css','#daterangepicker/moment.min.js','#daterangepicker/jquery.daterangepicker.min.js','#behaviour/page/datetime.min.js'];
 App.loader.libs.magnificPopup = ['#magnific-popup/magnific-popup.min.css','#magnific-popup/jquery.magnific-popup.min.js'];
 App.loader.libs.inputmask = ['#inputmask/inputmask.min.js','#inputmask/jquery.inputmask.min.js'];
 App.loader.libs.clipboard = ['#clipboard/clipboard.min.js','#clipboard/utils.js'];
-
+App.loader.libs.sparkMD5 = ['#crypto/spark-md5.min.js'];
 App.editor = {
 	browsingFileURL: App.loader.siteURL + (typeof (window.IS_BACKEND) !== 'undefined' && window.IS_BACKEND ? BACKEND_URL : FRONTEND_URL+'/user/file') + '/finder'
 };
 App.editor.loadingOverlay = function (options) {
-	App.loader.defined(typeof ($.fn.LoadingOverlay), 'loadingOverlay');
-	return $.LoadingOverlay(options||{});
+	App.loader.defined(typeof ($.fn.LoadingOverlay), 'loadingOverlay', function(){
+		$.LoadingOverlay(options||{});
+	});
 };
 App.editor.dialog = function (options) {
 	App.loader.defined(typeof (BootstrapDialog), 'dialog');
@@ -155,27 +172,32 @@ App.editor.markdownToHTML = function (elem, markdownData, options) {
 		var callback = function(){
 			return onSuccess(params);
 		};
-		App.loader.defined(typeof (marked), 'editormdPreview', function(){
-			if (params.flowChart) {
-				return App.loader.defined(typeof (flowchart), 'flowChart',function(){
-					return App.loader.defined(typeof ($.fn.flowChart), 'flowChartJQuery',function(){
-						if (params.sequenceDiagram) return App.loader.defined(typeof ($.fn.sequenceDiagram), 'sequenceDiagram',function(){
-							callback();
-						});
+		if (params.flowChart) {
+			return App.loader.defined(typeof (flowchart), 'flowChart',function(){
+				return App.loader.defined(typeof ($.fn.flowChart), 'flowChartJQuery',function(){
+					if (params.sequenceDiagram) return App.loader.defined(typeof ($.fn.sequenceDiagram), 'sequenceDiagram',function(){
 						callback();
 					});
-				});
-			}
-			if(needSequenceDiagram){
-				return App.loader.defined(typeof ($.fn.sequenceDiagram), 'sequenceDiagram',function(){
 					callback();
 				});
-			}
-			callback();
-		}, function(){
-			App.editor.markdownReset();
-		});
+			});
+		}
+		if(needSequenceDiagram){
+			return App.loader.defined(typeof ($.fn.sequenceDiagram), 'sequenceDiagram',function(){
+				callback();
+			});
+		}
+		callback();
 		return params;
+	};
+	var start=function(cb){
+		App.loader.defined(typeof (marked), 'editormdPreview', function(marked){
+			if(marked)window.marked=marked;
+			App.loader.defined(typeof (editormd), 'editormd', function(){
+				App.editor.markdownReset();
+				init(options,cb);
+			});
+		});
 	};
 	var loadingId = 'markdown-render-processing-'+ App.utils.unixtime();
 	var loadingHTML = '<div id="'+loadingId+'"><i class="fa fa-spinner fa-spin fa-3x"></i></div>';
@@ -190,7 +212,7 @@ App.editor.markdownToHTML = function (elem, markdownData, options) {
 		}else{
 			box.first().before(loadingHTML);
 		}
-		init(options,function(params){
+		start(function(params){
 			box.each(function () {
 				if($(this).children('textarea').length>0){
 					params.markdown = $(this).children('textarea').text();
@@ -205,7 +227,7 @@ App.editor.markdownToHTML = function (elem, markdownData, options) {
 		return;
 	}
 	$(elem).before(loadingHTML);
-	init(options,function(params){
+	start(function(params){
 		var viewer = editormd.markdownToHTML(elem, params);
 		$(elem).data('markdown-viewer', viewer);
 		$('#'+loadingId).remove();
@@ -219,11 +241,9 @@ App.editor.markdowns = function (editorElement, uploadUrl, options) {
 };
 /* 初始化Markdown编辑器 */
 App.editor.markdown = function (editorElement, uploadUrl, options) {
+	App.loader.defined(typeof (editormd), 'editormd', function(){
 	var isManager = false;
 	if (!uploadUrl) uploadUrl = $(editorElement).attr('action');
-	App.loader.defined(typeof (editormd), 'editormd', null, function(){
-		App.editor.markdownReset();
-	});
 	if (uploadUrl) {
 		if (uploadUrl.substr(0, 1) == '!') {
 			uploadUrl = uploadUrl.substr(1);
@@ -285,7 +305,9 @@ App.editor.markdown = function (editorElement, uploadUrl, options) {
 		}
 	};
 	if (typeof(window.THEME_COLOR)=='string'&&window.THEME_COLOR=='dark') {
-		defaults.theme = "dark"; // ambiance
+		defaults.editorTheme = "ambiance";
+		defaults.previewTheme = "dark";
+		defaults.theme = "dark";
 	}
 	var params = $.extend({}, defaults, options || {});
 	if (isManager) {
@@ -337,6 +359,9 @@ App.editor.markdown = function (editorElement, uploadUrl, options) {
 	$(editorElement).data('editor-name', 'markdown');
 	$(editorElement).data('editor-object', editor);
 	return editor;
+	}, function(){
+		App.editor.markdownReset();
+	});
 };
 App.editor.md = App.editor.markdown;
 
@@ -399,8 +424,8 @@ App.editor.tinymces = function (elem, uploadUrl, options, useSimpleToolbar) {
 };
 App.editor.finderDialog = function (remoteURL, callback, zIndex) {
 	if(!zIndex) zIndex = 2000;
-	App.loader.defined(typeof (BootstrapDialog), 'dialog');
-	var dialog = BootstrapDialog.show({
+	App.loader.defined(typeof(BootstrapDialog),'dialog',function(){
+	BootstrapDialog.show({
 		title: App.t('选择文件'),
 		//animate: false,
 		message: function (dialog) {
@@ -424,7 +449,7 @@ App.editor.finderDialog = function (remoteURL, callback, zIndex) {
 		}
 		//,data: {'pageToLoad': remoteURL}
 	});
-	return dialog;
+	});
 };
 App.editor.tinymceOnceFix = false;
 App.editor.tinymce = function (elem, uploadUrl, options, useSimpleToolbar) {
@@ -562,6 +587,7 @@ App.editor.tinymce = function (elem, uploadUrl, options, useSimpleToolbar) {
 		quickbars_selection_toolbar: selectionToobar,
 		noneditable_noneditable_class: "mceNonEditable",
 		toolbar_drawer: 'sliding',
+		extended_valid_elements: 'span[class], i[class]',//允许保留span标签及其class属性 document:https://www.tiny.cloud/docs/tinymce/5/valid-elements/
 		contextmenu: contextmenu,
 		setup: function (editor) {
 			var toTimeHtml = function (date) {
@@ -605,33 +631,63 @@ App.editor.tinymce = function (elem, uploadUrl, options, useSimpleToolbar) {
 };
 
 App.editor.switcher = function(swicherElem, contentElem, defaultEditorName) {
-	if($(swicherElem).length<1) return;
-	var event, tagName = String($(swicherElem).get(0).tagName).toLowerCase();
-	switch(tagName){
-		case 'select':
-			event = 'change';
-			break;
-		default:
-			event = 'click';
-	}
-	$(swicherElem).on(event, function(){
-		var etype=$(this).val()||$(this).attr('value');
+	var initEditor=function(etype){
 		var texta=$(contentElem);
 		var editorName=texta.data('editor-name') || defaultEditorName;
+		if(!etype){
+			etype=texta.data("editor-type");
+			if (!etype) {
+				switch(editorName){
+					case 'tinymce':
+					case 'ckeditor':
+					case 'ueditor':
+						etype='html';
+						break;
+					case 'editormd':
+					case 'markdown':
+					case 'vditor':
+						etype='markdown';
+						break;
+					default:
+						etype='text';
+				}
+			}
+		}
 		texta.data("editor-type",etype);
 		return App.editor.switch(editorName, texta);
-	});
-	$(contentElem).data('placeholder', $(contentElem).attr('placeholder'));
-	switch(tagName){
-		case 'input':
-			$(swicherElem).filter(':checked').first().trigger(event);
-			break;
-		case 'select':
-			$(swicherElem).filter(':selected').first().trigger(event);
-			break;
-		default:
-			$(swicherElem).filter('.active').first().trigger(event);
 	}
+	if(swicherElem && $(swicherElem).length>0) {
+		var event, tagName = String($(swicherElem).get(0).tagName).toLowerCase();
+		switch(tagName){
+			case 'select':
+				event = 'change';
+				break;
+			case 'input':
+				if($(swicherElem).attr('type')=='hidden'){
+					initEditor($(swicherElem).val());
+					return;
+				}
+			default:
+				event = 'click';
+		}
+		$(swicherElem).on(event, function(){
+			var etype=$(this).val()||$(this).attr('value');
+			initEditor(etype);
+		});
+		switch(tagName){
+			case 'input':
+				$(swicherElem).filter(':checked').first().trigger(event);
+				break;
+			case 'select':
+				$(swicherElem).filter(':selected').first().trigger(event);
+				break;
+			default:
+				$(swicherElem).filter('.active').first().trigger(event);
+		}
+	}else{
+		initEditor();
+	}
+	$(contentElem).data('placeholder', $(contentElem).attr('placeholder'));
 };
 
 //例如：App.editor.switch($('textarea'))
@@ -744,6 +800,9 @@ App.editor.switch = function (editorName, texta, cancelFn, tips) {
 	return true;
 };
 if (typeof (App.utils) == 'undefined') App.utils = {};
+App.utils.getJQueryObject = function(a) {
+    return typeof a == "object" && a instanceof jQuery ? a : $(a);
+};
 App.utils.elemToId = function(elem) {
 	if (typeof (elem) != "object") {
 		if (String(elem).substring(0,1) != '#') {
@@ -751,10 +810,11 @@ App.utils.elemToId = function(elem) {
 		}
 		return elem;
 	}
-	var id = $(elem).attr("id");
+	var $j = App.utils.getJQueryObject(elem);
+	var id = $j.attr("id");
 	if (id) return '#'+id;
 	id = 'generated-id-' + App.utils.unixtime();
-	$(elem).attr("id", id);
+	$j.attr("id", id);
 	return '#'+id;
 };
 App.utils.unixtime = function() {
@@ -781,8 +841,9 @@ App.editor.selectPage = function(elem,options,loaded){
     	keyField: 'id',
     	data: [], // url or data
     	params: function(){return {};},
-    	eAjaxSuccess: function(d){
+    	eAjaxSuccess: function(d, type){
 			if(!d) return undefined;
+			if(d.Code!=1) return String(d.Info);
 			var list = typeof(d.Data[listKey])!='undefined'?d.Data[listKey]:d.Data.list;
 			if(list==null) list=[];
 			var paging;
@@ -790,9 +851,21 @@ App.editor.selectPage = function(elem,options,loaded){
 				paging={limit:0,page:1,rows:0,pages:0};
 			}else{
 				paging=d.Data[pagingKey];
+				if(paging && 'next' in paging){
+        			return {
+          				"list": list,
+          				"pageSize": paging.limit,
+						"next": paging.next,
+						"prev": paging.prev,
+						"curr": paging.curr,
+						"isFirst": paging.isFirst,
+						"hasNext": paging.hasNext,
+						"hasPrev": paging.hasPrev
+        			};
+				};
 			}
         	return {
-          		"list":list,
+          		"list": list,
           		"pageSize": paging.limit,
           		"pageNumber": paging.page,
           		"totalRow": paging.rows,
@@ -805,10 +878,26 @@ App.editor.selectPage = function(elem,options,loaded){
 	if(!loaded)App.loader.defined(typeof ($.fn.selectPage), 'selectPage');
 	$(elem).selectPage($.extend({},defaults,options||{}));
 }
-App.editor.select2 = function(){
-	App.loader.defined(typeof ($.fn.select2), 'select2');
-	App.loader.defined(typeof (App.select2), 'select2ex');
-	return App.select2;
+App.editor.select2 = function(element, options){
+	App.loader.defined(typeof ($.fn.select2), 'select2', function(){
+		App.loader.defined(typeof (App.select2), 'select2ex', function(){
+			$(element).each(function(){App.select2.select(this, options);});
+		});
+	});
+}
+App.editor.selectTags = function(element, tagsArray, ajax, sortable, onlySelect, extOpts){
+	var f = function(){
+	App.loader.defined(typeof ($.fn.select2), 'select2', function(){
+		App.loader.defined(typeof (App.select2), 'select2ex', function(){
+			$(element).each(function(){App.select2.tags(this, tagsArray, ajax, sortable, onlySelect, extOpts);});
+		});
+	});
+	}
+	if(sortable){
+		App.loader.defined(typeof ($.fn.sortable), 'jqueryui', f);
+	}else{
+		f();
+	}
 }
 App.editor.cascadeSelect = function(elem,selectedIds,url){
 	App.loader.defined(typeof (CascadeSelect), 'cascadeSelect', function(){
@@ -836,48 +925,84 @@ App.editor.float = function(elem, mode, attr, position, options) {
 		App.float(elem, mode, attr, position, options);
 	});
 };
-App.editor.fileInput = function (elem, options, successCallback, errorCallback) {
+App.editor.detectImageByFileName = function(fileURL) {
+	var dotIndex = fileURL.lastIndexOf('.');
+	if (dotIndex < 0) {
+		return false;
+	}
+	var fileExt = fileURL.substring(dotIndex + 1);
+	switch (fileExt.toLowerCase()) {
+		case 'jpg':
+		case 'png':
+		case 'jpeg':
+		case 'gif':
+		case 'webp':
+		case 'svg':
+		case 'bmp':
+		case 'ico':
+		case 'tiff':
+		case 'tif':
+		case 'apng':
+		case 'avif':
+		case 'heic':
+		case 'heif':
+		case 'jxl':
+		case 'jxr':
+		case 'pjpeg':
+		case 'pjp':
+		case 'raw':
+		case 'webm':
+		case 'wmf':
+			return true;
+		default:
+			return false;
+	}
+};
+App.editor.fileInput = function (elem, options, successCallback, errorCallback, imageDetector) {
 	if (!elem) {
 		elem = '';
 	} else {
 		elem = App.utils.elemToId(elem) + ' ';
 	}
-	App.loader.defined(typeof ($.fn.powerFloat), 'powerFloat');
-	App.loader.defined(typeof ($.fn.uploadPreviewer), 'uploadPreviewer');
+	if(!imageDetector) imageDetector = App.editor.detectImageByFileName;
+	App.loader.defined(typeof($.fn.powerFloat),'powerFloat',function(){
+		App.loader.defined(typeof($.fn.uploadPreviewer),'uploadPreviewer',function(){
+		
+	var changeVal = function(obj, fileURL) {
+		var $parent = $(obj).closest('.input-group-btn');
+		var dataInput = $(obj).data('input');
+		if (!dataInput && $parent.length>0) {
+			var $input = $parent.prev('input');
+			if($input.length<1) $input = $parent.prev('.input-group-btn').prev('input');
+			if($input.length>0) dataInput = $input[0];
+		}
+		if (dataInput) $(dataInput).val(fileURL);
+		if(!imageDetector(fileURL)) fileURL = '';
+		var previewButton = $(obj).data('preview-btn');
+		if (!previewButton && $parent.length>0) previewButton = $parent.siblings('.preview-btn')[0];
+		if (previewButton) {
+			if (!$(previewButton).data('attached-float')) {
+				App.float(App.utils.elemToId(previewButton) + " a img");
+				$(previewButton).data('attached-float', true);
+			}
+			$(previewButton).removeClass('hidden').children('a').attr('href', fileURL).children('img').attr('src', fileURL);
+		}
+		var previewIMG = $(obj).data('preview-img');
+		if (previewIMG) $(previewIMG).attr('src', fileURL);
+	};
 	$(elem + '[data-toggle="finder"]').each(function () {
 		$(this).on('click', function (e) {
-			var managerUrl = $(this).data('finder-url')|| App.editor.browsingFileURL;
+			var managerUrl = $(this).data('finder-url')||App.editor.browsingFileURL;
 			if (!managerUrl) return;
 			managerUrl = managerUrl.replace(/[\?&]multiple=1/, '');
-			if (managerUrl.indexOf('?') >= 0) {
-				managerUrl += '&';
-			} else {
-				managerUrl += '?';
-			}
-			managerUrl += 'from=parent&client=fileInput&filetype=image';
+			var sep = managerUrl.indexOf('?') >= 0 ? '&' : '?',
+			  filetype = $(this).data('file-type')||'image',
+			  urlquery = $(this).data('url-query')||'';
+			managerUrl += sep+'from=parent&client=fileInput&filetype='+filetype+(urlquery?'&'+urlquery:'');
 			var that = this;
 			App.editor.finderDialog(managerUrl, function(fileList){
 				var fileURL = fileList[0];
-				var dataInput = $(that).data('input');
-				if (!dataInput) {
-					dataInput = $(that).parent('.input-group-btn').siblings('input')[0];
-				}
-				if (dataInput) $(dataInput).val(fileURL);
-				var previewButton = $(that).data('preview-btn');
-				if (!previewButton) {
-					previewButton = $(that).parent('.input-group-btn').siblings('.preview-btn')[0];
-				}
-				if (previewButton) {
-					if (!$(previewButton).data('attached-float')) {
-						App.float(App.utils.elemToId(previewButton) + " a img");
-						$(previewButton).data('attached-float', true);
-					}
-					$(previewButton).removeClass('hidden').children('a').attr('href', fileURL).children('img').attr('src', fileURL);
-				}
-				var previewIMG = $(that).data('preview-img');
-				if (previewIMG) {
-					$(previewIMG).attr('src', fileURL);
-				} 
+				changeVal(that,fileURL);
 				if(successCallback) successCallback(fileURL);
 			});
 		});
@@ -905,26 +1030,7 @@ App.editor.fileInput = function (elem, options, successCallback, errorCallback) 
 					return App.message({ text: r.Info, type: 'error' });
 				}
 				var fileURL = r.Data.files[0];
-				var dataInput = $(e.target).data('input');
-				if (!dataInput) {
-					dataInput = $(e.target).parents('.input-group-btn').prev('input')[0];
-				}
-				$(dataInput).val(fileURL);
-				var previewButton = $(e.target).data('preview-btn');
-				if (!previewButton) {
-					previewButton = $(e.target).parents('.input-group-btn').siblings('.preview-btn')[0];
-				}
-				if (previewButton) {
-					if (!$(previewButton).data('attached-float')) {
-						App.float(App.utils.elemToId(previewButton) + " a img");
-						$(previewButton).data('attached-float', true);
-					}
-					$(previewButton).removeClass('hidden').children('a').attr('href', fileURL).children('img').attr('src', fileURL);
-				}
-				var previewIMG = $(e.target).data('preview-img');
-				if (previewIMG) {
-					$(previewIMG).attr('src', fileURL);
-				}
+				changeVal(e.target,fileURL);
 				if(successCallback) successCallback(fileURL);
 				App.message({ text: App.t('上传成功'), type: 'success' });
 			},function(){
@@ -932,8 +1038,22 @@ App.editor.fileInput = function (elem, options, successCallback, errorCallback) 
 			});
 		});
 	});
+	$(elem + 'span.preview-btn + input.fileinput-value').on('change', function () {
+        var $preview =$(this).prev('span.preview-btn');
+		var val = $(this).val();
+		if(!imageDetector(val)) val = '';
+        if(val){
+            $preview.removeClass('hidden');
+        }else if(!$preview.hasClass('hidden')){
+            $preview.addClass('hidden');
+        }
+        $preview.children('a').attr('href',val).children('img').attr('src',val);
+	});
+
+		});
+	});
 };
-App.editor.codemirror = function (elem,options,loadLangType) {
+App.editor.codemirror = function (elem,options,loadLangType,refresh) {
 	if($(elem).length<1) return null;
 	var init = function(){
 		if($(elem).data('codemirror'))return;
@@ -1030,6 +1150,10 @@ App.editor.codemirror = function (elem,options,loadLangType) {
 		}
         editor.on('keypress', function(){if(typeof(editor.showHint)=='function')editor.showHint();});
 		$(elem).data('codemirror',editor);
+		if(!refresh) return;
+		if(refresh===true)setTimeout(function(){editor.refresh();},300);
+		else if(typeof(refresh)=='number') setTimeout(function(){editor.refresh();},refresh);
+		else if(typeof(refresh)=='function') refresh(editor);
 	};
 	App.loader.defined(typeof (CodeMirror), 'codemirror', init, function(){
 		CodeMirror.modeURL = ASSETS_URL+"/js/editor/markdown/lib/codemirror/mode/%N/%N.js";
@@ -1181,11 +1305,187 @@ App.editor.galleryPopup = function(elem,options,callback){
 };
 App.editor.inputmask = function(elem,options) {
 	App.loader.defined(typeof ($.fn.inputmask), 'inputmask',function(){
+		//https://robinherbots.github.io/Inputmask/#/documentation
 		App.getJQueryObject(elem).inputmask(options);
 	});
-}
+};
 App.editor.clipboard = function(elem,options) {
 	App.loader.defined(typeof (ClipboardJS), 'clipboard',function(){
 		attachCopy(elem,options);
 	});
-}
+};
+App.editor.multilingualContentEditor = function(formContainer,contentElem,uploadUrl,helpBlock,beforeSwitchCallback){
+  var root=formContainer?$(formContainer):$('body');
+  var container=$(contentElem).parent()
+  root.find('textarea[data-editor-name]').each(function(){
+	if(beforeSwitchCallback) beforeSwitchCallback.call(this,arguments);
+  	if(helpBlock)$(this).parent().after(helpBlock);
+  	$(this).attr('action',uploadUrl);
+  	$(this).attr('data-markdown-options','{"height":'+container.height()+',"width":'+container.width()+'}');
+  	App.editor.switcher("input[name='contype']", '#'+this.id,'tinymce');
+  })
+  var tabSwitchCallback = function(){
+    var that=$(this);
+    if(that.data('refreshing'))return;
+    that.data('refreshing',true);
+    setTimeout(function(){
+    var target=that.find('a').attr('href');
+    var editor =$(target).find('textarea[data-editor-name]').data('editor-object');
+    if(editor) {
+      if(typeof(editor.codeEditor)!='undefined'){ // editormd
+        editor.codeEditor.refresh();
+      }else if(typeof(editor.fire)!='undefined'){ // tinymce
+        editor.fire('ResizeWindow');
+      }else if(typeof(editor.dispatch)!='undefined'){ // tinymce8
+        editor.dispatch('ResizeWindow');
+      }
+    }
+    that.data('refreshing',false);
+    },200);
+  };
+  var tabs=root.find('div[data-editor-name] > .langset > .nav-tabs li');
+  if(tabs.length>0){
+	tabs.on('click',tabSwitchCallback);
+  }else{
+	root.find('.langset').each(function(){
+		if($(this).find('textarea[data-editor-name]').length>0){
+			$(this).find('.nav-tabs li').on('click',tabSwitchCallback);
+		}
+	})
+  }
+};
+App.editor.md5file = function(file, done, options) {
+	App.loader.defined(typeof (SparkMD5), 'sparkMD5', function() {
+    var chunkSize = 2097152; // 2MB
+	var progressBar = null;
+	if(options){
+		if(typeof(options.chunkSize)!='undefined') chunkSize = options.chunkSize;
+		if(typeof(options.progressBar)!='undefined') progressBar = options.progressBar;
+	}
+    var spark = new SparkMD5.ArrayBuffer();
+    var currentChunk = 0;
+    var chunks = Math.ceil(file.size / chunkSize);
+    
+    function loadChunk(start) {
+        var end = Math.min(start + chunkSize, file.size);
+        var chunk = file.slice(start, end);
+        var reader = new FileReader();
+        
+        reader.onload = function(e) {
+            spark.append(e.target.result);
+            currentChunk++;
+            
+            // 更新进度
+			if (progressBar) {
+				var progress = (currentChunk / chunks) * 100;
+				progressBar.style.width = progress + '%';
+			}
+            
+            if (currentChunk < chunks) {
+                loadChunk(end);
+            } else {
+                // 计算完成
+                var hash = spark.end();
+                done(hash);
+            }
+        };
+        
+        reader.readAsArrayBuffer(chunk);
+    }
+    
+    loadChunk(0);
+	});
+};
+App.editor.editable = function(elem,options) {
+	App.loader.defined(typeof ($.fn.editable), 'editable', function() {
+	var successCallback, errorCallback, displayCallback, saveCallback, shownCallback, ajaxOptions;
+	if(options && typeof options == 'object'){
+		if('success' in options) {
+			successCallback = options.success;
+			delete options.success;
+		}
+		if('error' in options) {
+			errorCallback = options.error;
+			delete options.error;
+		}
+		if('displayCallback' in options) {
+			displayCallback = options.displayCallback;
+			delete options.displayCallback;
+		}
+		if('saveCallback' in options) {
+			saveCallback = options.saveCallback;
+			delete options.saveCallback;
+		}
+		if('shown' in options) {
+			shownCallback = options.shown;
+			delete options.shown;
+		}
+		if('ajaxOptions' in options) {
+			ajaxOptions = ajaxOptions;
+			delete options.ajaxOptions;
+		}
+	}
+	var defaults = {
+		url: window.location.href,
+		type: 'text',
+		pk: '', name: '',
+		title: '',
+		display: displayCallback ? function(inputValue, response){
+        	if(!response) return;
+			if(response.Code!=1) return;
+			displayCallback.apply(this,arguments);
+		} : null,
+		ajaxOptions:{
+			dataType: 'json', 
+			type: options && typeof options == 'object' && 'method' in options ? options.method : 'POST',
+			success: function(r){
+				if(r.Code!=1) {
+					if(errorCallback && errorCallback.call(this,r)) return;
+					return App.message({text:r.Info,class_name:'danger'});
+				}
+				if(successCallback && successCallback.call(this,r)) return;
+				return App.message({text:r.Info,class_name:'success'});
+			},
+			error: function(xhr){
+				if(errorCallback && errorCallback.call(this,r,xhr)) return;
+				return App.message({text:xhr.responseText,class_name:'danger'});
+			}
+		}
+		// , savenochange: false // 是否没有更改时依然提交保存
+		// , emptytext: 'Empty', // 值为空白时显示内容,如果设置为匿名函数则使用函数结果值
+	};
+	var $options = $.extend(true, defaults, options||{});
+	if(ajaxOptions) $options = $.extend(true,$options,ajaxOptions||{});
+	$(elem).each(function(){
+		var inputType=$(this).data('type'), pk=$(this).data('pk'), name=$(this).data('name'),
+			url=$(this).data('url'), title=$(this).data('title');
+		var _options = {};
+		if(inputType) _options.type=inputType;
+		if(pk) _options.pk=pk;
+		if(name) _options.name=name;
+		if(url) {
+			_options.url=url;
+		}else if(typeof $options.url == 'function') {
+			_options.url=$options.url.call(this);
+		}
+		if(title) _options.title=title;
+		var $span = $(this).find('.editable');
+		$span.editable($.extend(true,{},$options,_options));
+		if(shownCallback){
+    		$span.on('shown', function(e, editable) {
+    		    //editable.input.$input.attr('step','0.01');
+				shownCallback.apply(this,arguments);
+    		});
+		}
+	    $span.on('save', function(e, params){
+			var response = params.response;
+	        if(!response) return;
+			if(response.Code!=1) params.newValue=$(this).data('value');
+			if(saveCallback) saveCallback.apply(this,arguments);
+	    });
+		//$span.on('nochange',function(){});//options.savenochange为false且值没有更改时触发
+	});
+	});
+};
+return App.editor;
+}));
