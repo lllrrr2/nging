@@ -12,7 +12,7 @@ LABEL org.opencontainers.image.source=https://github.com/admpub/nging \
 #RUN apk update && apk upgrade
 
 
-# RUN wget -c https://dl.webx.top/nging/v4.1.5/nging_linux_${TARGETARCH}.tar.gz -O /home/nging.tar.gz
+# RUN wget -c https://cdn.coscms.com/nging/v${VERSION}/nging_linux_${TARGETARCH}.tar.gz -O /home/nging.tar.gz
 # 对应 TARGETARCH 值通常为: amd64, arm64, arm, armv7 等（请确保构建产物与 TARGETARCH 一致）
 COPY ./dist/packed/v${VERSION}/nging_linux_${TARGETARCH}.tar.gz /home/nging.tar.gz
 

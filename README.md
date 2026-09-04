@@ -17,9 +17,7 @@ Nging是一个网站服务程序，可以管理和配置 Caddy 和 Nginx 站点�
 
 ## 可执行文件下载
 
-* [最新版下载地址](http://dl.webx.top/nging/latest/)
-
-* [最新版备用地址](http://dl2.webx.top/nging/latest/)
+* [最新版下载地址](https://www.coscms.com/product/download/nging?package=free)
 
 ## 安装方式
 
